@@ -1,16 +1,21 @@
-#include <curses.h>
+#ifdef _WIN32
+    #include <pdcurses.h>
+    #include <windows.h>
+#else
+    #include <curses.h>
+    #include <unistd.h>  
+#endif
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 struct head {
     int posX;
     int posY;
 };
 
-struct snake{
+struct snake {
     struct head body[1024];
     int velX;
     int velY;
@@ -19,7 +24,7 @@ struct snake{
     char* texture_head;
 };
 
-struct food{
+struct food {
     char* texture;
     int posX;
     int posY;
@@ -29,7 +34,15 @@ void updatePos(struct snake *s, WINDOW *win);
 bool checkLoss(struct snake *s, int startX, int startY, int width, int height);
 void spawnFood(struct food *fd, int maxX, int maxY);
 
-int main(){
+void sleep_ms(int milliseconds) {
+#ifdef _WIN32
+    Sleep(milliseconds);  // Windows Sleep takes milliseconds
+#else
+    usleep(milliseconds * 1000);  // Linux usleep takes microseconds
+#endif
+}
+
+int main() {
     initscr();
     cbreak();
     keypad(stdscr, true);
@@ -43,7 +56,7 @@ int main(){
     int startY = (LINES - height) / 2; // Half of the screen - box
     int startX = (COLS - width) / 2; // Half of the screen - box
     WINDOW* win = newwin(height, width, startY, startX);
-    box(win,0,0);
+    box(win, 0, 0);
     wrefresh(win);
 
     struct snake p;
@@ -56,12 +69,12 @@ int main(){
     p.size = 5;
 
     struct food fd;
-    spawnFood(&fd, width-2, height-2);
+    spawnFood(&fd, width - 2, height - 2);
 
     bool lost = false;
     int score = 0;
     while (!lost) {
-        mvprintw(startY+height, startX, "Score: %d",score);
+        mvprintw(startY + height, startX, "Score: %d", score);
         int key = getch();
         if (key == KEY_RIGHT && p.velX == 0) {
             p.velX = 1;
@@ -84,7 +97,7 @@ int main(){
         box(win, 0, 0);
         updatePos(&p, win);
         mvwaddstr(win, fd.posY, fd.posX, fd.texture);
-        
+
         if (fd.posY == p.body[0].posY && fd.posX == p.body[0].posX) {
             spawnFood(&fd, width - 2, height - 2);
             p.size += 1;
@@ -92,17 +105,20 @@ int main(){
         }
 
         wrefresh(win);
-        usleep(100000);
+
+        // Cross-platform sleep
+        sleep_ms(100);  // 100 milliseconds delay
+
         lost = checkLoss(&p, startX, startY, width, height);
     }
 
     delwin(win);
     endwin();
-    printf("You fucking lost\n");
+    printf("You lost!\n");
     return 0;
 }
 
-void updatePos(struct snake *s, WINDOW *win){
+void updatePos(struct snake *s, WINDOW *win) {
     for (int i = s->size; i >= 0; i--) {
         if (i == 0) {
             s->body[i].posX += s->velX;
@@ -111,7 +127,7 @@ void updatePos(struct snake *s, WINDOW *win){
                 s->texture_head = ">";
             } else if (s->velX == -1) {
                 s->texture_head = "<";
-            } else if (s->velY == 1){
+            } else if (s->velY == 1) {
                 s->texture_head = "v";
             } else if (s->velY == -1) {
                 s->texture_head = "^";
@@ -124,26 +140,24 @@ void updatePos(struct snake *s, WINDOW *win){
     }
 }
 
-
 bool checkLoss(struct snake *s, int startX, int startY, int width, int height) {
     for (int i = s->size; i >= 0; i--) {
         if (i != 0) {
-            if (s->body[i].posX == s->body[0].posX &&
-                s->body[i].posY == s->body[0].posY) {
+            if (s->body[i].posX == s->body[0].posX && s->body[i].posY == s->body[0].posY) {
                 return true;
             }
         }
     }
-    if (s->body[0].posX <= 0 || s->body[0].posX >= width-1 ||
-        s->body[0].posY <= 0 || s->body[0].posY >= height-1) {
+    if (s->body[0].posX <= 0 || s->body[0].posX >= width - 1 ||
+        s->body[0].posY <= 0 || s->body[0].posY >= height - 1) {
         return true;
     }
     return false;
 }
-
 
 void spawnFood(struct food *fd, int maxX, int maxY) {
     fd->posX = rand() % maxX + 1;
     fd->posY = rand() % maxY + 1;
     fd->texture = "&";
 }
+
